@@ -1,0 +1,45 @@
+# =============================================================================
+# Word Selection Assistant - .gitignore
+# =============================================================================
+# 敏感信息
+.env
+.env.local
+.env.*.local
+
+# 日志文件
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 系统
+.DS_Store
+Thumbs.db
+
+# 虚拟环境
+venv/
+env/
+.venv/
+
+# 备份
+*.bak
+*.backup
