@@ -1,3 +1,4 @@
+# 非常感谢iflow cli全体员工；全程用的都是iflow cli助手
 # Word Selection Assistant (划词助手)
 
 一个基于 PyQt6 的桌面划词助手，集成了 AI 能力，支持翻译、解释、总结等功能。
