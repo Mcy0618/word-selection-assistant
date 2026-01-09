@@ -13,6 +13,8 @@ from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PyQt6.QtGui import QFont, QPainter, QColor, QPen, QCursor
 from PyQt6.QtCore import Qt, QTimer, QPoint
 
+# type: ignore[attr-defined, arg-type]
+
 logger = logging.getLogger(__name__)
 
 
@@ -108,11 +110,22 @@ class PopupWindow(QWidget):
         self.result_frame.setObjectName("result_frame")
         self.result_frame.setVisible(False)
         result_layout = QVBoxLayout(self.result_frame)
+        result_layout.setContentsMargins(0, 0, 0, 0)
+        result_layout.setSpacing(5)
         
-        self.result_label = QLabel("")
-        self.result_label.setWordWrap(True)
-        self.result_label.setObjectName("result")
-        result_layout.addWidget(self.result_label)
+        # 结果文本框（支持代码块）
+        self.result_text = QTextEdit()
+        self.result_text.setObjectName("result")
+        self.result_text.setReadOnly(True)
+        self.result_text.setMaximumHeight(200)
+        result_layout.addWidget(self.result_text)
+        
+        # 复制按钮
+        self.btn_copy = QPushButton("📋 复制")
+        self.btn_copy.setObjectName("btn_copy")
+        self.btn_copy.setVisible(False)
+        self.btn_copy.clicked.connect(self._copy_result)
+        result_layout.addWidget(self.btn_copy, alignment=Qt.AlignmentFlag.AlignRight)
         
         card_layout.addWidget(self.result_frame)
         
@@ -199,7 +212,8 @@ class PopupWindow(QWidget):
         
         # 重置结果区域
         self.result_frame.setVisible(False)
-        self.result_label.setText("")
+        self.result_text.setPlainText("")
+        self.btn_copy.setVisible(False)
         
         # 显示窗口
         self._position_at_cursor()
@@ -216,7 +230,7 @@ class PopupWindow(QWidget):
         y = cursor_pos.y() + 20
         
         # 确保不超出屏幕
-        screen = QApplication.primaryScreen().geometry()
+        screen = QApplication.primaryScreen().geometry() # pyright: ignore[reportOptionalMemberAccess]
         if x + self.width() > screen.width():
             x = screen.width() - self.width() - 20
         if y + self.height() > screen.height():
@@ -230,7 +244,8 @@ class PopupWindow(QWidget):
         
         # 显示加载状态
         self.result_frame.setVisible(True)
-        self.result_label.setText("处理中...")
+        self.result_text.setPlainText("处理中...")
+        self._apply_plain_style()
         
         # 使用 QTimer 模拟异步处理
         QTimer.singleShot(500, lambda: self._process_text_sync(feature_type))
@@ -271,24 +286,123 @@ class PopupWindow(QWidget):
         finally:
             loop.close()
         
-        self.result_label.setText(result)
+        # 显示结果
+        self.result_text.setPlainText(result)
+        
+        # 根据内容类型应用样式
+        if self._is_code(result):
+            self._apply_code_style()
+        else:
+            self._apply_plain_style()
+        
+        # 显示复制按钮
+        self.btn_copy.setVisible(True)
+        self.btn_copy.setText("📋 复制")
+    
+    def _is_code(self, text: str) -> bool:
+        """检测文本是否为代码"""
+        import re
+        code_patterns = [
+            r'\bdef\s+\w+\s*\(',
+            r'\bfunction\s+\w+\s*\(',
+            r'\bclass\s+\w+\s*[:{]',
+            r'\{[\s\S]*\}',
+            r'=>\s*[{]',
+            r'\bif\s+\w+\s*:',
+            r'\bfor\s+\w+\s*:',
+            r'\bwhile\s+\w+\s*:',
+            r'\bimport\s+\w+',
+            r'\bfrom\s+\w+\s+import',
+            r'\breturn\s+',
+            r'console\.log\(',
+            r'print\(',
+            r'System\.out\.println',
+        ]
+        
+        for pattern in code_patterns:
+            if re.search(pattern, text):
+                return True
+        
+        # 检查缩进和特殊字符密度
+        lines = text.split('\n')
+        if len(lines) > 1:
+            indented_lines = sum(1 for line in lines if line.startswith(('    ', '\t', '  ')))
+            if indented_lines > len(lines) * 0.3:
+                return True
+        
+        return False
+    
+    def _apply_code_style(self):
+        """应用代码块样式（浅色主题）"""
+        self.result_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #f5f5f5;
+                color: #333333;
+                font-family: Consolas, "Cascadia Code", "Fira Code", "Microsoft YaHei Mono", monospace;
+                font-size: 13px;
+                border: 1px solid #d0d0d0;
+                border-radius: 6px;
+                padding: 8px;
+                line-height: 1.5;
+            }
+        """)
+        self.result_frame.setStyleSheet("""
+            #result_frame {
+                background: #f8f8f8;
+                border: 1px dashed #ccc;
+                border-radius: 8px;
+                padding: 8px;
+            }
+        """)
+    
+    def _apply_plain_style(self):
+        """应用普通文本样式"""
+        self.result_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #f0f7ff;
+                color: #333333;
+                font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+                font-size: 13px;
+                border-radius: 6px;
+                padding: 8px;
+                line-height: 1.5;
+            }
+        """)
+        self.result_frame.setStyleSheet("""
+            #result_frame {
+                background: #f0f7ff;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+    
+    def _copy_result(self):
+        """复制结果到剪贴板"""
+        text = self.result_text.toPlainText()
+        QApplication.clipboard().setText(text) # pyright: ignore[reportOptionalMemberAccess]
+        
+        # 显示复制成功反馈
+        self.btn_copy.setText("✅ 已复制")
+        
+        # 2秒后恢复
+        QTimer.singleShot(2000, lambda: self.btn_copy.setText("📋 复制"))
     
     def _on_auto_hide(self):
         """自动隐藏"""
         self.hide()
     
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event): # pyright: ignore[reportIncompatibleMethodOverride]
         """鼠标按下"""
         if event.button() == Qt.MouseButton.LeftButton:
             self.dragging = True
             self.drag_position = event.pos()
     
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event): # pyright: ignore[reportIncompatibleMethodOverride]
         """鼠标移动"""
         if self.dragging:
             self.move(self.pos() + event.pos() - self.drag_position)
     
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event): # pyright: ignore[reportIncompatibleMethodOverride]
         """鼠标释放"""
         self.dragging = False
     
@@ -296,6 +410,6 @@ class PopupWindow(QWidget):
         """鼠标进入"""
         self.hide_timer.stop()
     
-    def leaveEvent(self, event):
+    def leaveEvent(self, event): # pyright: ignore[reportIncompatibleMethodOverride]
         """鼠标离开"""
         self.hide_timer.start(3000)
