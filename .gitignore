@@ -30,6 +30,8 @@ htmlcov/
 *.swp
 *.swo
 *~
+.qwen/
+.iflow/
 
 # 系统
 .DS_Store

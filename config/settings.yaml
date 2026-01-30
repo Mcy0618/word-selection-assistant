@@ -1,102 +1,79 @@
-# 划词助手配置文件
-# 2024-01-07
-
-# 应用设置
-app:
-  name: "划词助手"
-  version: "1.0.0"
-  auto_start: false
-  language: "zh-CN"
-
-# 热键设置
-hotkey:
-  enabled: true
-  combination: "ctrl+q"  # 触发划词弹窗 (与代码保持一致)
-  modifier_keys: 0xC0 | 0x40  # Ctrl+Alt (Windows)
-  virtual_key: ord('Q')
-
-# 窗口设置
-window:
-  width: 400
-  height: 300
-  opacity: 0.95
-  stay_on_top: true
-  auto_hide: true
-  hide_delay: 5000  # 毫秒
-
-# AI设置
 ai:
-  # 默认AI提供者
-  default_provider: "xiaoma"
-  
-  # API配置
   api:
-    timeout: 30
+    enable_stream: true
     max_retries: 3
-    
-  # 小马算力配置
+    stream_chunk_size: 100
+    timeout: 30
+  cache:
+    enabled: true
+    max_size: 100
+    ttl: 3600
+  default_provider: xiaoma
+  performance:
+    enabled: true
+    log_interval: 60
   xiaoma:
+    api_base: https://api.tokenpony.com
+    api_key: ''
     enabled: true
-    api_base: "https://api.tokenpony.com"
-    api_key: "sk-bc9a324556144d50972b583b5b121b40"
-    model: "minimax-m2"
-    temperature: 0.3
     max_tokens: 10000
-  
-  # OpenAI兼容接口配置
-  openai:
-    enabled: true
-    api_base: "https://api.openai.com/v1"
-    api_key: ""
-    model: "gpt-3.5-turbo"
-    temperature: 0.7
-    max_tokens: 2000
-  
-  # iFlow SDK配置
-  iflow:
-    enabled: false
-    url: "ws://localhost:8090/acp"
-    auto_start: true
-
-# 功能配置
+    model: qwen3-32b
+    temperature: 0.3
+app:
+  auto_start: false
+  language: 中文
+  name: 智能划词助手
+  theme: light
+  version: 2.0.0
 features:
-  # 翻译功能
-  translator:
+  chart:
+    auto_detect: true
+    chart_height: 300
     enabled: true
-    target_language: "中文"
-    preserve_format: true
-  
-  # 解释功能
+    output_dir: charts
+  custom:
+    config_file: ~/.word_selection_assistant/custom_settings.json
+    enabled: true
+    max_functions: 10
   explainer:
+    audience: general
+    detail_level: medium
     enabled: true
-    detail_level: "medium"  # simple, medium, detailed
-    audience: "general"  # beginner, general, expert
-  
-  # 总结功能
+  python_explainer:
+    default_level: default
+    enable_improvement_suggestions: false
+    enable_structure_analysis: true
+    enabled: true
   summarizer:
     enabled: true
     max_length: 500
-    style: "concise"  # concise, detailed, bullet
-  
-  # 自定义功能
-  custom:
+    style: concise
+  translator:
     enabled: true
-    max_functions: 10
-
-# 日志配置
+    preserve_format: true
+    target_language: 中文
+hotkey:
+  combination: ctrl+q
+  enabled: true
+  modifier_keys: 0xC0 | 0x40
+  virtual_key: ord('Q')
 logging:
-  level: "INFO"
-  file_enabled: true
-  file_path: "logs/assistant.log"
-  max_size: 10485760  # 10MB
   backup_count: 3
-
-# 安全设置
+  file_enabled: true
+  file_path: logs/assistant.log
+  level: INFO
+  max_size: 10485760
 security:
-  # 敏感内容处理
-  mask_sensitive: true
   allowed_apps:
-    - "chrome"
-    - "firefox"
-    - "edge"
-    - "vscode"
+  - chrome
+  - firefox
+  - edge
+  - vscode
+  mask_sensitive: true
+window:
+  auto_hide: true
+  height: 300
+  hide_delay: 20000
+  opacity: 0.95
+  stay_on_top: true
+  width: 400

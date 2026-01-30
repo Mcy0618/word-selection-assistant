@@ -74,34 +74,34 @@ class TrayIcon(QSystemTrayIcon):
         show_action = QAction("📖 显示窗口", self)
         show_action.triggered.connect(self.show_popup_requested.emit)
         self.menu.addAction(show_action)
-        
+
         # 分隔线
         self.menu.addSeparator()
-        
+
         # 功能菜单
         translate_action = QAction("🔤 翻译", self)
         translate_action.triggered.connect(lambda: self._on_quick_action("translate"))
         self.menu.addAction(translate_action)
-        
+
         explain_action = QAction("💡 解释", self)
         explain_action.triggered.connect(lambda: self._on_quick_action("explain"))
         self.menu.addAction(explain_action)
-        
+
         summarize_action = QAction("📝 总结", self)
         summarize_action.triggered.connect(lambda: self._on_quick_action("summarize"))
         self.menu.addAction(summarize_action)
-        
+
         # 分隔线
         self.menu.addSeparator()
-        
+
         # 设置
         settings_action = QAction("⚙️ 设置", self)
         settings_action.triggered.connect(self.settings_requested.emit)
         self.menu.addAction(settings_action)
-        
+
         # 分隔线
         self.menu.addSeparator()
-        
+
         # 退出
         exit_action = QAction("❌ 退出", self)
         exit_action.triggered.connect(self._on_exit)

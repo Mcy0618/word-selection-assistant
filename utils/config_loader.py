@@ -5,9 +5,12 @@
 """
 
 import logging
+import os
+import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 import yaml
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +28,55 @@ class ConfigLoader:
         self.config_file = config_file
         self.config: Dict[str, Any] = {}
         
+        # 加载 .env 文件
+        self._load_env_file()
+        
         if config_file:
             self.load(config_file)
+    
+    def _load_env_file(self):
+        """加载 .env 文件"""
+        try:
+            # 尝试从项目根目录加载 .env
+            project_root = Path(__file__).parent.parent
+            env_file = project_root / ".env"
+            
+            if env_file.exists():
+                load_dotenv(env_file)
+                logger.info(f"已加载环境变量文件: {env_file}")
+        except Exception as e:
+            logger.warning(f"加载 .env 文件失败: {e}")
+    
+    def _replace_env_vars(self, data: Any) -> Any:
+        """
+        递归替换配置中的环境变量占位符
+        
+        Args:
+            data: 配置数据（可能是字典、列表或字符串）
+        
+        Returns:
+            Any: 替换后的数据
+        """
+        if isinstance(data, dict):
+            return {k: self._replace_env_vars(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._replace_env_vars(item) for item in data]
+        elif isinstance(data, str):
+            # 匹配 ${VAR_NAME} 格式
+            pattern = r'\$\{([^}]+)\}'
+            
+            def replace_match(match):
+                var_name = match.group(1)
+                # 优先从环境变量读取
+                value = os.getenv(var_name)
+                if value is not None:
+                    return value
+                # 如果环境变量不存在，返回原始字符串
+                return match.group(0)
+            
+            return re.sub(pattern, replace_match, data)
+        else:
+            return data
     
     def load(self, file_path: str) -> Dict[str, Any]:
         """
@@ -47,6 +97,8 @@ class ConfigLoader:
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 self.config = yaml.safe_load(f) or {}
+                # 自动替换环境变量
+                self.config = self._replace_env_vars(self.config)
                 logger.info(f"已加载配置: {file_path}")
                 return self.config
         except Exception as e:

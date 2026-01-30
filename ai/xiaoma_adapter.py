@@ -63,6 +63,16 @@ class XiaomaAdapter(BaseAdapter):
             "claude-3": "glm",
         }
         
+        # 创建复用的 OpenAI 客户端（自动连接池）
+        from openai import OpenAI
+        self.client = OpenAI(
+            base_url=self.api_base,
+            api_key=self.api_key,
+            timeout=30,
+            max_retries=3,
+            http_client=None  # 使用默认 httpx 连接池
+        )
+        
         logger.info(f"API配置: base={self.api_base}, key=***")
     
     async def _get_session(self) -> aiohttp.ClientSession:
@@ -98,8 +108,8 @@ class XiaomaAdapter(BaseAdapter):
             # 转换消息格式
             prompt = self._convert_messages(messages)
             
-            # 调用实际API
-            response = await self._call_api(prompt, **kwargs)
+            # 调用实际API（非流式）
+            response = await self._call_api_sync(prompt, **kwargs)
             
             # 转换为OpenAI格式
             return self._format_response(response)
@@ -117,22 +127,20 @@ class XiaomaAdapter(BaseAdapter):
             text_parts.append(f"[{role}]: {content}")
         return '\n'.join(text_parts)
     
-    async def _call_api(self, prompt: str, **kwargs) -> str:
+    async def _call_api_sync(self, prompt: str, **kwargs):
         """
-        调用小马算力API（OpenAI兼容格式）
-        """
-        # 在线程池中执行同步API调用
-        loop = asyncio.get_event_loop()
+        调用小马算力API（非流式）
         
-        def sync_call():
-            from openai import OpenAI
-            
-            client = OpenAI(
-                base_url=self.api_base,
-                api_key=self.api_key
-            )
-            
-            response = client.chat.completions.create(
+        Args:
+            prompt: 提示词
+            **kwargs: 其他参数（temperature, max_tokens等）
+        
+        Returns:
+            str: 完整响应
+        """
+        try:
+            # 非流式调用 - 使用复用的客户端
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[{"role": "user", "content": prompt}],
                 stream=False,
@@ -140,15 +148,38 @@ class XiaomaAdapter(BaseAdapter):
             )
             
             return response.choices[0].message.content
-        
-        try:
-            result = await loop.run_in_executor(None, sync_call)
-            logger.info(f"API调用成功，返回长度: {len(result)}")
-            return result
+                
         except Exception as e:
             logger.error(f"API调用失败: {e}")
-            # 返回错误信息而不是模拟数据
             raise
+    
+    async def _call_api_stream(self, prompt: str, **kwargs):
+        """
+        调用小马算力API（流式）
+        
+        Args:
+            prompt: 提示词
+            **kwargs: 其他参数（temperature, max_tokens等）
+        
+        Yields:
+            str: 流式输出的内容块
+        """
+        try:
+            # 流式调用 - 使用复用的客户端
+            stream_response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                stream=True,
+                temperature=kwargs.get('temperature', 0.7)
+            )
+            
+            for chunk in stream_response:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+                
+        except Exception as e:
+            logger.error(f"API调用失败: {e}")
+            yield f"错误: {str(e)}"
     
     def _format_response(self, content: str) -> Dict[str, Any]:
         """格式化响应为OpenAI格式"""
@@ -175,16 +206,22 @@ class XiaomaAdapter(BaseAdapter):
     
     async def stream_chat(self, messages: List[Dict], **kwargs):
         """
-        流式聊天
-        产生字典流，每项包含 'content' 字段
+        流式聊天（真实实现）
+        
+        Args:
+            messages: OpenAI格式的消息列表
+            **kwargs: 其他参数（temperature, max_tokens等）
+        
+        Yields:
+            Dict: 包含 'content' 和 'delta' 字段的字典
         """
         try:
             prompt = self._convert_messages(messages)
-            # 模拟流式输出
-            words = prompt.split()[:10]
-            for word in words:
-                yield {"content": word + " ", "delta": True}
-                await asyncio.sleep(0.05)
+            
+            # 调用真实流式API
+            async for chunk in self._call_api_stream(prompt, **kwargs):
+                yield {"content": chunk, "delta": True}
+                
         except Exception as e:
             logger.error(f"流式请求失败: {e}")
             yield {"error": str(e)}

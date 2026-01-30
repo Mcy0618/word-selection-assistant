@@ -6,7 +6,7 @@ AI辅助自定义功能模块
 
 import logging
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, AsyncGenerator
 from dataclasses import dataclass, asdict
 from ai.xiaoma_adapter import XiaomaAdapter
 from ai.prompt_generator import PromptGenerator
@@ -41,6 +41,9 @@ class CustomBuilder:
         self.adapter = adapter
         self.prompt_generator = prompt_generator or PromptGenerator()
         self.custom_functions: Dict[str, CustomFunction] = {}
+        
+        # 预加载内置自定义功能
+        self._load_builtin_functions()
     
     def create_function(self, description: str, name: Optional[str] = None) -> CustomFunction:
         """
@@ -135,6 +138,57 @@ class CustomBuilder:
             "parameters": {}
         }
     
+    async def execute_stream(self, function_name: str, text: str, 
+                            parameters: Optional[Dict[str, Any]] = None) -> AsyncGenerator[Dict[str, str], None]:
+        """
+        流式执行自定义功能
+        
+        Args:
+            function_name: 功能名称
+            text: 输入文本
+            parameters: 额外参数（可选），如level用于选择讲解级别
+        
+        Yields:
+            Dict: 包含 'content' 字段的字典
+        """
+        if function_name not in self.custom_functions:
+            yield {"error": f"功能不存在: {function_name}"}
+            return
+        
+        func = self.custom_functions[function_name]
+        parameters = parameters or {}
+        
+        if not self.adapter:
+            yield {"content": f"[模拟执行] {func.name}: {text}"}
+            return
+        
+        try:
+            # 使用PromptGenerator生成提示词
+            user_prompt = self.prompt_generator.get_prompt(
+                function_name,
+                text,
+                {**(func.parameters or {}), **parameters}
+            )
+            
+            messages = [
+                {"role": "system", "content": f"你是一个{func.description}专家。"},
+                {"role": "user", "content": user_prompt}
+            ]
+            
+            # 调用流式API
+            async for chunk in self.adapter.stream_chat(messages):
+                if "error" in chunk:
+                    yield chunk
+                    break
+                
+                content = chunk.get("content", "")
+                if content:
+                    yield {"content": content, "delta": True}
+                    
+        except Exception as e:
+            logger.error(f"流式执行失败: {e}")
+            yield {"error": str(e)}
+    
     def save_functions(self, file_path: str):
         """保存自定义功能到文件"""
         import json
@@ -176,3 +230,67 @@ class CustomBuilder:
             del self.custom_functions[name]
             return True
         return False
+    
+    def _load_builtin_functions(self):
+        """加载内置自定义功能"""
+        # Python代码讲解功能
+        python_explainer = CustomFunction(
+            name="python_explainer",
+            description="Python代码讲解",
+            prompt_template=self._get_python_explainer_template(),
+            parameters={
+                "sub_type": "default",  # default, beginner, advanced
+                "language": "python"
+            }
+        )
+        self.custom_functions["python_explainer"] = python_explainer
+        logger.info("已加载内置功能: python_explainer")
+    
+    def _get_python_explainer_template(self) -> str:
+        """获取Python代码讲解提示词模板"""
+        return self.prompt_generator.get_prompt(
+            "python_explainer",
+            "{{text}}",
+            {"sub_type": "default"}
+        )
+
+    async def execute_simple(self, prompt: str, model: Optional[str] = None) -> str:
+        """
+        简单执行自定义功能
+
+        Args:
+            prompt: 完整的提示词
+            model: 指定的模型（可选）
+
+        Returns:
+            str: 执行结果
+        """
+        if not self.adapter:
+            return f"[模拟执行] 提示词: {prompt}\n[使用模型: {model or '默认'}]"
+
+        try:
+            messages = [
+                {"role": "system", "content": "你是一个多功能AI助手，根据用户提供的提示词执行相应任务。"},
+                {"role": "user", "content": prompt}
+            ]
+
+            # 如果指定了模型，临时设置模型
+            if model:
+                # 保存原始模型
+                original_model = getattr(self.adapter, 'model', None)
+                try:
+                    self.adapter.model = model
+                    response = await self.adapter.chat(messages)
+                finally:
+                    # 恢复原始模型
+                    if original_model:
+                        self.adapter.model = original_model
+            else:
+                response = await self.adapter.chat(messages)
+
+            content = response.get("choices", [{}])[0].get("message", {}).get("content", "")
+            return content
+
+        except Exception as e:
+            logger.error(f"简单执行失败: {e}")
+            return f"执行失败: {e}"
