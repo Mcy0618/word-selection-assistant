@@ -29,6 +29,7 @@ from ui.popup_window import PopupWindow
 from ui.settings_dialog import SettingsDialog
 from utils.theme_manager import get_theme_manager, ThemeType
 from ai.xiaoma_adapter import XiaomaAdapter
+from ai.ollama_adapter import OllamaAdapter
 from features.translator import Translator
 from features.explainer import Explainer
 from features.summarizer import Summarizer
@@ -120,22 +121,37 @@ class WordSelectionAssistant(QObject):
 
     def _init_components(self):
         """初始化组件"""
-        # API适配器
-        self.xiaoma_adapter = XiaomaAdapter()
+        # 根据配置选择API适配器
+        default_provider = self.config.get('ai', {}).get('default_provider', 'openai')
+        
+        if default_provider == 'ollama':
+            self.ai_adapter = OllamaAdapter(
+                api_base=self.config.get('ai', {}).get('ollama', {}).get('api_base'),
+            )
+            # 设置默认模型
+            ollama_model = self.config.get('ai', {}).get('ollama', {}).get('model', 'llama3.2')
+            self.ai_adapter.set_model(ollama_model)
+            logger.info(f"使用Ollama适配器，模型: {ollama_model}")
+        else:  # 默认使用OpenAI兼容API
+            self.ai_adapter = XiaomaAdapter()  # 保留向后兼容性
+            # 设置默认模型
+            openai_model = self.config.get('ai', {}).get('openai', {}).get('model', 'gpt-3.5-turbo')
+            self.ai_adapter.set_model(openai_model)
+            logger.info(f"使用OpenAI兼容适配器，模型: {openai_model}")
 
         # 功能模块
-        self.translator = Translator(self.xiaoma_adapter)
-        self.explainer = Explainer(self.xiaoma_adapter)
-        self.summarizer = Summarizer(self.xiaoma_adapter)
-        self.custom_builder = CustomBuilder(self.xiaoma_adapter)
-        self.prompt_optimizer = PromptOptimizer(self.xiaoma_adapter)
+        self.translator = Translator(self.ai_adapter)
+        self.explainer = Explainer(self.ai_adapter)
+        self.summarizer = Summarizer(self.ai_adapter)
+        self.custom_builder = CustomBuilder(self.ai_adapter)
+        self.prompt_optimizer = PromptOptimizer(self.ai_adapter)
 
         # 图表生成模块（初始化依赖检查）
         try:
             from features.chart_generator import ChartGenerator
             from utils.chart_code_executor import ChartCodeExecutor
             self.chart_code_executor = ChartCodeExecutor()
-            self.chart_generator = ChartGenerator(self.xiaoma_adapter, self.chart_code_executor)
+            self.chart_generator = ChartGenerator(self.ai_adapter, self.chart_code_executor)
             logger.info("图表功能已初始化")
         except ImportError as e:
             logger.warning(f"图表功能初始化失败（依赖缺失）: {e}")

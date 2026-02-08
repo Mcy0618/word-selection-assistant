@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-小马算力API适配器
-集成tokenpony的小马算力API
+OpenAI兼容API适配器
+支持各种OpenAI兼容的服务提供商
 """
 
 import os
@@ -22,25 +22,25 @@ logger = logging.getLogger(__name__)
 
 class BaseAdapter(ABC):
     """API适配器基类"""
-    
+
     @abstractmethod
     async def chat(self, messages: List[Dict], **kwargs) -> Dict[str, Any]:
         """发送聊天请求"""
         pass
-    
+
     @abstractmethod
     def set_model(self, model: str):
         """设置模型"""
         pass
 
 
-class XiaomaAdapter(BaseAdapter):
-    """小马算力API适配器 - 兼容OpenAI格式"""
-    
+class OpenAIAdapter(BaseAdapter):
+    """OpenAI兼容API适配器"""
+
     def __init__(self, api_key: str = None, api_base: str = None):
         """
-        初始化小马算力适配器
-        
+        初始化OpenAI兼容适配器
+
         Args:
             api_key: API密钥（可选，默认从.env读取）
             api_base: API基础URL（可选，默认从.env读取）
@@ -50,19 +50,12 @@ class XiaomaAdapter(BaseAdapter):
         env_path = PROJECT_ROOT / ".env"
         if env_path.exists():
             load_dotenv(env_path)
-        
-        self.api_key = api_key or os.getenv('TOKENPONY_API_KEY')
-        self.api_base = (api_base or os.getenv('TOKENPONY_BASE_URL', 'https://api.tokenpony.cn/v1')).rstrip('/')
-        self.model = "minimax-m2"  # 使用有效的模型名称
+
+        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
+        self.api_base = (api_base or os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')).rstrip('/')
+        self.model = "gpt-3.5-turbo"  # 使用通用模型名称
         self.session = None
-        
-        # 模型映射
-        self.model_mapping = {
-            "gpt-4": "deepseek",
-            "gpt-3.5-turbo": "qwen",
-            "claude-3": "glm",
-        }
-        
+
         # 创建复用的 OpenAI 客户端（自动连接池）
         from openai import OpenAI
         self.client = OpenAI(
@@ -72,8 +65,8 @@ class XiaomaAdapter(BaseAdapter):
             max_retries=3,
             http_client=None  # 使用默认 httpx 连接池
         )
-        
-        logger.info(f"API配置: base={self.api_base}, key=***")
+
+        logger.info(f"OpenAI兼容API配置: base={self.api_base}, key=***")
     
     async def _get_session(self) -> aiohttp.ClientSession:
         """获取或创建HTTP会话"""
@@ -207,21 +200,31 @@ class XiaomaAdapter(BaseAdapter):
     async def stream_chat(self, messages: List[Dict], **kwargs):
         """
         流式聊天（真实实现）
-        
+
         Args:
             messages: OpenAI格式的消息列表
             **kwargs: 其他参数（temperature, max_tokens等）
-        
+
         Yields:
             Dict: 包含 'content' 和 'delta' 字段的字典
         """
         try:
-            prompt = self._convert_messages(messages)
-            
             # 调用真实流式API
-            async for chunk in self._call_api_stream(prompt, **kwargs):
-                yield {"content": chunk, "delta": True}
-                
+            stream_response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                stream=True,
+                temperature=kwargs.get('temperature', 0.7)
+            )
+
+            for chunk in stream_response:
+                if chunk.choices[0].delta.content:
+                    yield {"content": chunk.choices[0].delta.content, "delta": True}
+
         except Exception as e:
             logger.error(f"流式请求失败: {e}")
             yield {"error": str(e)}
+
+
+# 为了向后兼容，保留XiaomaAdapter名称
+XiaomaAdapter = OpenAIAdapter

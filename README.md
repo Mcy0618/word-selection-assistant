@@ -1,6 +1,6 @@
 # Word Selection Assistant (智能划词助手) 🎯
 
-一个基于 PyQt6 的智能文本处理助手，集成多模态 AI 能力，支持文本翻译、解释、总结和自定义功能处理。
+一个基于 PyQt6 的智能文本处理助手，集成多模态 AI 能力，支持文本翻译、解释、总结和自定义功能处理。支持本地Ollama模型和OpenAI兼容API。
 
 ## 🆕 核心功能
 
@@ -8,22 +8,19 @@
 - **🌍 文本翻译**: 支持多语言智能翻译
 - **💡 内容解释**: 智能解释文本含义和背景
 - **📋 内容总结**: 自动提取文本要点和总结
+- **📊 图表生成**: 根据文本内容生成可视化图表
+- **✨ 提示词优化**: 优化用户输入的提示词
 - **⚙️ 自定义功能**: 个性化AI功能配置和模型选择
 
-### 🤖 AI模型支持
-- **20个专业模型**:
-  - `qwen3-32b`, `qwen3-8b` (通用模型)
-  - `deepseek-v3-0324`, `deepseek-r1-0528` (推理模型)
-  - `qwen3-next-80b-a3b-instruct` (指令模型)
-  - `hunyuan-a13b-instruct`, `glm-4.6` (商业模型)
-  - `qwen3-vl-235b-a22b-instruct`, `qwen3-vl-30b-a3b-instruct` (多模态)
-  - `deepseek-ocr`, `minimax-m2` (专用模型)
-  - `qwen3-coder-480b` (代码模型)
-  - 以及更多专业模型
+### 🤖 AI服务支持
+- **Ollama本地模型**: 保护隐私，离线使用，支持各种开源模型
+- **OpenAI兼容API**: 支持各种OpenAI兼容的服务提供商
+- **灵活切换**: 通过配置文件轻松切换AI提供商
+
 
 ### 🎯 自定义功能特性
 - **提示词模板**: 支持个性化AI提示词配置
-- **模型选择**: 20个专业AI模型可选
+- **模型选择**: 支持多种本地和云端模型
 - **设置持久化**: 配置自动保存和加载
 - **参数优化**: 智能模型参数调整
 
@@ -33,6 +30,7 @@
 
 - Python 3.8+
 - Windows 10/11
+- Ollama (可选，如需使用本地模型)
 
 ### 安装依赖
 
@@ -41,14 +39,27 @@ cd word-selection-assistant
 pip install -r requirements.txt
 ```
 
+### 安装并运行Ollama (如需使用本地模型)
+
+1. 下载并安装Ollama: https://ollama.com/download
+2. 启动Ollama服务: `ollama serve`
+3. 拉取所需模型: `ollama pull llama3.2` (或其他模型)
+
 ### 配置 API
 
-编辑 `.env` 文件，配置你的 API 密钥：
+编辑 `.env` 文件，配置你的 API 服务：
 
 ```env
-TOKENPONY_API_KEY=your_api_key_here
-TOKENPONY_BASE_URL=https://api.tokenpony.cn/v1
+# Ollama 配置 (推荐 - 本地运行，无需API密钥)
+OLLAMA_BASE_URL=http://localhost:11434/v1
+OLLAMA_API_KEY= # Ollama通常不需要API密钥
+
+# 或者 OpenAI兼容API 配置 (可选)
+# OPENAI_API_KEY=your_api_key_here
+# OPENAI_BASE_URL=https://api.openai.com/v1
 ```
+
+**注意**: 如果同时配置了Ollama和OpenAI兼容API，可通过修改 `config/settings.yaml` 中的 `default_provider` 来选择默认服务提供商。
 
 ### 运行程序
 
@@ -71,6 +82,13 @@ python main.py
    - 编写个性化提示词模板（使用 `{text}` 作为文本占位符）
    - 选择合适的AI模型
 3. **保存配置**: 点击保存，设置立即生效
+
+### 模型提供商切换
+1. **编辑配置**: 修改 `config/settings.yaml` 文件
+2. **更改提供商**: 修改 `ai.default_provider` 字段
+   - `ollama`: 使用本地Ollama模型
+   - `openai`: 使用OpenAI兼容API
+3. **重启程序**: 使配置更改生效
 
 ## 项目结构
 
@@ -266,37 +284,43 @@ python_explainer:
 
 ## AI模型说明
 
-### 🎯 推荐模型选择
+### 🎯 模型选择指南
 
-| 用途 | 推荐模型 | 特点 |
-|------|----------|------|
-| 通用文本 | `qwen3-32b` | 性能均衡，速度快 |
-| 快速处理 | `qwen3-8b` | 轻量级，响应快 |
-| 深度推理 | `deepseek-r1-0528` | 强推理能力 |
-| 多模态 | `qwen3-vl-235b-a22b-instruct` | 支持图像理解 |
-| 代码处理 | `qwen3-coder-480b` | 专用代码模型 |
+项目支持多种AI模型，您可以根据需求选择：
 
-### 📊 模型性能对比
-- **速度**: qwen3-8b > qwen3-32b > deepseek-r1-0528
-- **准确性**: deepseek-r1-0528 > qwen3-32b > qwen3-8b
-- **多语言**: 所有模型都支持多语言处理
+- **本地模型 (Ollama)**: 保护隐私，无需网络连接，适合敏感数据处理，需要本地安装Ollama
+- **云端模型 (OpenAI兼容API)**: 性能强大，功能丰富，需要网络连接和API密钥
+
+### 📊 模型特性对比
+- **本地 vs 云端**: 本地模型保护隐私和离线使用，云端模型功能更全面
+- **成本 vs 性能**: 本地模型无需API费用但依赖本地硬件，云端模型按使用付费但性能更强
+- **多语言支持**: 大多数现代模型都支持多语言处理
+- **响应速度**: 本地模型响应更快（取决于硬件），云端模型取决于网络状况
 
 ## 常见问题
 
 ### Q: 程序启动后没有反应
 A: 检查系统托盘，程序运行后图标会出现在托盘区域。可能是托盘图标被隐藏了。
 
-### Q: Ctrl+Q 快捷键不生效  
-A: 
+### Q: Ctrl+Q 快捷键不生效
+A:
 - 确保当前有文本被选中
 - 检查是否有其他程序占用该快捷键
 - 尝试使用系统托盘图标右键菜单
+- 确保以管理员权限运行程序
 
 ### Q: API 调用失败
 A:
-- 检查 `.env` 文件中的 `TOKENPONY_API_KEY` 是否正确
+- 如果使用Ollama: 确认Ollama服务正在运行 (`ollama serve`)，并已拉取所需模型
+- 如果使用OpenAI兼容API: 检查 `.env` 文件中的 `OPENAI_API_KEY` 是否正确
 - 确认网络连接正常
 - 检查API服务商是否正常
+
+### Q: 模型找不到错误
+A:
+- 检查 `config/settings.yaml` 中配置的模型名称是否存在于本地Ollama中
+- 使用 `ollama list` 命令查看本地可用模型
+- 更新配置文件中的模型名称为实际存在的模型
 
 ### Q: 自定义功能不生效
 A:
@@ -328,6 +352,14 @@ A: 配置文件位置：`~/.word_selection_assistant/custom_settings.json`
 3. 实现事件处理方法
 
 ## 更新日志
+
+### v2.1.0 (2026-02-08)
+- ✨ **API提供商变更**: 从专有API转向支持Ollama本地模型和OpenAI兼容API
+- 🔧 **新增**: 本地Ollama模型支持
+- ⚙️ **优化**: 配置系统支持多种AI提供商
+- 🌐 **增强**: 支持各种OpenAI兼容的服务提供商
+- 🚀 **性能**: 本地模型响应更快，保护用户隐私
+- 📱 **UI**: 优化模型选择和配置管理
 
 ### v2.0.0 (2026-01-18)
 - ✨ **重大更新**: 全新自定义功能系统

@@ -17,33 +17,27 @@ class ConfigManager:
     
     # 可用模型列表
     AVAILABLE_MODELS = [
-        "qwen3-32b",
-        "qwen3-8b", 
-        "deepseek-v3-0324",
-        "deepseek-r1-0528",
-        "qwen3-next-80b-a3b-instruct",
-        "hunyuan-a13b-instruct",
-        "deepseek-v3.1-terminus",
-        "deepseek-v3.2-exp",
-        "qwen3-vl-235b-a22b-instruct",
-        "qwen3-vl-30b-a3b-instruct",
-        "deepseek-ocr",
-        "glm-4.6",
-        "qwen3-235b-a22b-instruct-2507",
-        "minimax-m2",
-        "bge-m3",
-        "bge-reranker-v2-m3",
-        "qwen3-embedding-8b",
-        "qwen3-reranker-8b",
-        "deepseek-v3.2",
-        "qwen3-coder-480b"
+        # 本地Ollama模型
+        "qwen3-embedding", "novaforgeai/deepseek-coder", "kimi-k2.5", "minimax-m2.1",
+        "glm-4.7", "deepseek-v3.2", "gemini-3-pro-preview", "gemini-3-flash-preview",
+        "dandank/chatgpt", "dandank/deepseek", "kimi-k2-thinking", "qwen3-vl",
+        "deepseek-v3.1", "qwen3-coder", "gpt-oss",
+        
+        # 通用模型名称
+        "llama3", "llama3.1", "llama3.2", "mistral", "gemma", "gemma2", "phi3", "phi3.5",
+        "mixtral", "yi", "llava", "moondream", "qwen2", "qwen2.5", "command-r", "command-r-plus",
+        
+        # OpenAI兼容API模型
+        "gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini",
+        "claude-3-haiku", "claude-3-sonnet", "claude-3-opus", "claude-3-5-sonnet",
+        "gemini-1.5-pro", "gemini-1.5-flash", "llama-3.1-8b", "llama-3.1-70b", "llama-3.2-1b", "llama-3.2-3b"
     ]
     
     # 默认自定义设置
     DEFAULT_CUSTOM_SETTINGS = {
         'prompt_template': "请对以下内容进行自定义处理：\n\n{text}",
         'function_name': "自定义功能",
-        'model': "qwen3-32b",  # 使用可用的模型
+        'model': "llama3.2",  # 使用通用模型名称
         'timestamp': 0
     }
     
