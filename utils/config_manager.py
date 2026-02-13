@@ -15,29 +15,36 @@ logger = setup_logger("config_manager")
 class ConfigManager:
     """配置管理器"""
     
-    # 可用模型列表
+    # 可用模型列表 - 本地Ollama模型
     AVAILABLE_MODELS = [
-        # 本地Ollama模型
-        "qwen3-embedding", "novaforgeai/deepseek-coder", "kimi-k2.5", "minimax-m2.1",
-        "glm-4.7", "deepseek-v3.2", "gemini-3-pro-preview", "gemini-3-flash-preview",
-        "dandank/chatgpt", "dandank/deepseek", "kimi-k2-thinking", "qwen3-vl",
-        "deepseek-v3.1", "qwen3-coder", "gpt-oss",
+        # 本地Ollama模型（从 ollama list 获取）
+        "qwen3-embedding:0.6b",
+        "novaforgeai/deepseek-coder:6.7b-optimized",
         
-        # 通用模型名称
-        "llama3", "llama3.1", "llama3.2", "mistral", "gemma", "gemma2", "phi3", "phi3.5",
-        "mixtral", "yi", "llava", "moondream", "qwen2", "qwen2.5", "command-r", "command-r-plus",
+        # 通用模型名称（需要使用ollama pull下载）
+        "llama3.3:70b",
+        "llama3.2:7b",
+        "mistral:7b",
+        "qwen2.5:7b",
+        "qwen2.5-coder:7b",
+        "gemma2:9b",
+        "phi3.5:3.8b",
+        "llava:7b",
+        "moondream:latest",
         
-        # OpenAI兼容API模型
-        "gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini",
-        "claude-3-haiku", "claude-3-sonnet", "claude-3-opus", "claude-3-5-sonnet",
-        "gemini-1.5-pro", "gemini-1.5-flash", "llama-3.1-8b", "llama-3.1-70b", "llama-3.2-1b", "llama-3.2-3b"
+        # 推理模型
+        "deepseek-r1:14b",
+        
+        # 嵌入模型
+        "nomic-embed-text:latest",
+        "mxbai-embed-large:latest",
     ]
     
     # 默认自定义设置
     DEFAULT_CUSTOM_SETTINGS = {
         'prompt_template': "请对以下内容进行自定义处理：\n\n{text}",
         'function_name': "自定义功能",
-        'model': "llama3.2",  # 使用通用模型名称
+        'model': "qwen3-embedding:0.6b",  # 使用本地Ollama模型
         'timestamp': 0
     }
     

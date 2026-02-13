@@ -51,9 +51,10 @@ class OpenAIAdapter(BaseAdapter):
         if env_path.exists():
             load_dotenv(env_path)
 
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
-        self.api_base = (api_base or os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')).rstrip('/')
-        self.model = "gpt-3.5-turbo"  # 使用通用模型名称
+        # 优先使用Ollama本地配置
+        self.api_key = api_key or os.getenv('OLLAMA_API_KEY', '')
+        self.api_base = (api_base or os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434/v1')).rstrip('/')
+        self.model = "qwen3-embedding:0.6b"  # 使用本地Ollama模型
         self.session = None
 
         # 创建复用的 OpenAI 客户端（自动连接池）

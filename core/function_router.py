@@ -22,6 +22,7 @@ class FunctionType(Enum):
     CUSTOM = "custom"
     CHART = "chart"  # 图表生成功能
     OPTIMIZE = "optimize"  # 提示词优化功能
+    ASK = "ask"  # 基于文本提问功能
 
 
 @dataclass
@@ -75,6 +76,9 @@ class FunctionRouter(QObject):
             elif func_type == "optimize":
                 recursive = options.get('recursive', False)
                 result = await self._execute_optimize(text, recursive)
+            elif func_type == "ask":
+                question = options.get('question', '')
+                result = await self._execute_ask(text, question)
             else:
                 result = f"未知功能: {func_type}"
 
@@ -113,6 +117,15 @@ class FunctionRouter(QObject):
         result = await handler(text, recursive)
         return result
 
+    async def _execute_ask(self, text: str, question: str) -> str:
+        """执行基于文本的提问功能"""
+        if FunctionType.ASK not in self.handlers:
+            return "错误: 提问处理器未注册"
+
+        handler = self.handlers[FunctionType.ASK]
+        result = await handler(text, question)
+        return result
+
     def get_available_functions(self) -> Dict[str, Dict[str, Any]]:
         """获取所有可用的功能"""
         functions = {
@@ -120,7 +133,8 @@ class FunctionRouter(QObject):
             "explain": {'name': '解释', 'description': '解释内容', 'icon': '💡'},
             "summarize": {'name': '总结', 'description': '总结要点', 'icon': '📝'},
             "chart": {'name': '绘图', 'description': '根据文本生成图表', 'icon': '📊'},
-            "optimize": {'name': '优化', 'description': '优化提示词', 'icon': '✨'}
+            "optimize": {'name': '优化', 'description': '优化提示词', 'icon': '✨'},
+            "ask": {'name': '提问', 'description': '基于文本提问', 'icon': '❓'}
         }
 
         for name, config in self.custom_functions.items():

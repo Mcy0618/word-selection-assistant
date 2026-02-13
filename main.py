@@ -36,8 +36,10 @@ from features.summarizer import Summarizer
 from features.custom_builder import CustomBuilder
 from features.chart_generator import ChartGenerator
 from features.prompt_optimizer import PromptOptimizer
+from features.question_asker import QuestionAsker
 from utils.logger import setup_logger
 from utils.config_loader import get_config
+from ai.iflow_adapter import iFlowAdapter
 
 
 def check_admin_privileges():
@@ -132,6 +134,10 @@ class WordSelectionAssistant(QObject):
             ollama_model = self.config.get('ai', {}).get('ollama', {}).get('model', 'llama3.2')
             self.ai_adapter.set_model(ollama_model)
             logger.info(f"使用Ollama适配器，模型: {ollama_model}")
+        elif default_provider == 'iflow':
+            iflow_model = self.config.get('ai', {}).get('iflow', {}).get('model', 'default')
+            self.ai_adapter = iFlowAdapter(model=iflow_model)
+            logger.info(f"使用iFlow适配器，模型: {iflow_model}")
         else:  # 默认使用OpenAI兼容API
             self.ai_adapter = XiaomaAdapter()  # 保留向后兼容性
             # 设置默认模型
@@ -145,6 +151,7 @@ class WordSelectionAssistant(QObject):
         self.summarizer = Summarizer(self.ai_adapter)
         self.custom_builder = CustomBuilder(self.ai_adapter)
         self.prompt_optimizer = PromptOptimizer(self.ai_adapter)
+        self.question_asker = QuestionAsker(self.ai_adapter)
 
         # 图表生成模块（初始化依赖检查）
         try:
@@ -176,6 +183,10 @@ class WordSelectionAssistant(QObject):
         self.function_router.register_handler(FunctionType.OPTIMIZE, self.prompt_optimizer.optimize)
         logger.info("提示词优化处理器已注册到路由器")
 
+        # 注册提问处理器
+        self.function_router.register_handler(FunctionType.ASK, self.question_asker.ask)
+        logger.info("提问处理器已注册到路由器")
+
         # UI组件
         self.tray_icon = TrayIcon()
         self.popup_window = PopupWindow(
@@ -184,7 +195,8 @@ class WordSelectionAssistant(QObject):
             self.summarizer,
             custom_builder=self.custom_builder,
             chart_generator=self.chart_generator,
-            prompt_optimizer=self.prompt_optimizer
+            prompt_optimizer=self.prompt_optimizer,
+            question_asker=self.question_asker
         )
 
         # 集成配置到UI组件

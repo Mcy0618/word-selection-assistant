@@ -36,7 +36,8 @@ class PopupWindow(QWidget):
     stream_error = pyqtSignal(str)  # 流式错误
 
     def __init__(self, translator=None, explainer=None, summarizer=None,
-                 custom_builder=None, chart_generator=None, prompt_optimizer=None):
+                 custom_builder=None, chart_generator=None, prompt_optimizer=None,
+                 question_asker=None):
         """
         初始化弹窗
 
@@ -47,6 +48,7 @@ class PopupWindow(QWidget):
             custom_builder: 自定义功能构建器实例
             chart_generator: 图表生成功能实例
             prompt_optimizer: 提示词优化功能实例
+            question_asker: 提问功能实例
         """
         super().__init__()
 
@@ -57,6 +59,10 @@ class PopupWindow(QWidget):
         self.custom_builder = custom_builder
         self.chart_generator = chart_generator
         self.prompt_optimizer = prompt_optimizer
+        self.question_asker = question_asker
+
+        # 当前问题（用于提问功能）
+        self.current_question = ""
 
         # 当前文本
         self.current_text = ""
@@ -74,6 +80,13 @@ class PopupWindow(QWidget):
 
         # 流式输出状态
         self.is_streaming = False
+
+        # 窗口固定状态
+        self.is_pinned = False
+
+        # 对话模式状态
+        self.is_chat_mode = False  # 是否处于连续对话模式
+        self.chat_history = []  # 对话历史
 
         # 初始化自动隐藏定时器
         self.hide_timer = QTimer()
@@ -156,6 +169,7 @@ class PopupWindow(QWidget):
         self.btn_chart = self._create_button("📊 绘图", "chart")
         self.btn_optimize = self._create_button("✨ 优化", "optimize")
         self.btn_custom = self._create_button("⚙️ 自定义", "custom")
+        self.btn_ask = self._create_button("❓ 提问", "ask")
 
         self.buttons_layout.addWidget(self.btn_translate)
         self.buttons_layout.addWidget(self.btn_explain)
@@ -163,6 +177,7 @@ class PopupWindow(QWidget):
         self.buttons_layout.addWidget(self.btn_chart)
         self.buttons_layout.addWidget(self.btn_optimize)
         self.buttons_layout.addWidget(self.btn_custom)
+        self.buttons_layout.addWidget(self.btn_ask)
 
         # 级别选择按钮（仅当检测到Python代码时显示）
         self.btn_level_beginner = QPushButton("初学者")
@@ -292,12 +307,27 @@ class PopupWindow(QWidget):
 
         result_layout.addWidget(self.chart_container)
 
+        # 复制按钮和固定按钮容器
+        result_buttons_layout = QHBoxLayout()
+
+        # 固定按钮
+        self.btn_pin = QPushButton("📌 固定")
+        self.btn_pin.setObjectName("btn_pin")
+        self.btn_pin.setVisible(False)
+        self.btn_pin.setCheckable(True)
+        self.btn_pin.clicked.connect(self._on_pin_clicked)
+        result_buttons_layout.addWidget(self.btn_pin)
+
+        result_buttons_layout.addStretch()
+
         # 复制按钮
         self.btn_copy = QPushButton("📋 复制")
         self.btn_copy.setObjectName("btn_copy")
         self.btn_copy.setVisible(False)
         self.btn_copy.clicked.connect(self._copy_result)
-        result_layout.addWidget(self.btn_copy, alignment=Qt.AlignmentFlag.AlignRight)
+        result_buttons_layout.addWidget(self.btn_copy)
+
+        result_layout.addLayout(result_buttons_layout)
 
         card_layout.addWidget(self.result_frame)
 
@@ -431,13 +461,26 @@ class PopupWindow(QWidget):
         self.result_text.setPlainText("")
         self.btn_copy.setVisible(False)
 
+        # 重置固定按钮和状态
+        self.btn_pin.setVisible(False)
+        self.btn_pin.setChecked(False)
+        self.btn_pin.setText("📌 固定")
+        self.is_pinned = False
+
+        # 重置对话模式
+        self.is_chat_mode = False
+        self.chat_history = []
+        self.current_question = ""
+        # 清空提问器的对话历史
+        if self.question_asker:
+            self.question_asker.clear_history()
+
         # 显示窗口
         self._position_at_cursor()
         self.show()
 
-        # 重置自动隐藏计时器
+        # 停止自动隐藏计时器（不再自动隐藏）
         self.hide_timer.stop()
-        self.hide_timer.start(8000)  # 8秒后自动隐藏
 
     def show_with_screenshot(self, image_path: str):
         """显示弹窗（截图功能已移除）"""
@@ -450,13 +493,18 @@ class PopupWindow(QWidget):
         self.result_text.setPlainText("")
         self.btn_copy.setVisible(False)
 
+        # 重置固定按钮和状态
+        self.btn_pin.setVisible(False)
+        self.btn_pin.setChecked(False)
+        self.btn_pin.setText("📌 固定")
+        self.is_pinned = False
+
         # 显示窗口
         self._position_at_cursor()
         self.show()
 
-        # 重置自动隐藏计时器
+        # 停止自动隐藏计时器（不再自动隐藏）
         self.hide_timer.stop()
-        self.hide_timer.start(8000)  # 8秒后自动隐藏
 
         logger.info("截图功能已移除，显示提示信息")
 
@@ -508,6 +556,11 @@ class PopupWindow(QWidget):
             self.btn_level_beginner.setVisible(False)
             self.btn_level_default.setVisible(False)
             self.btn_level_advanced.setVisible(False)
+
+        # 特殊处理提问功能
+        if feature_type == "ask":
+            self._on_ask_clicked()
+            return
 
         # 根据配置选择流式或非流式
         streamable_types = ["translate", "explain", "summarize", "custom"]
@@ -631,8 +684,10 @@ class PopupWindow(QWidget):
             self.chart_container.setVisible(False)
             self.result_text.setPlainText(f"无法处理的结果类型: {type(result)}")
 
-        # 重启自动隐藏定时器
-        self.hide_timer.start(8000)
+        # 显示固定按钮
+        self.btn_pin.setVisible(True)
+        # 禁用自动隐藏
+        self.hide_timer.stop()
 
     @pyqtSlot(str)
     def _on_stream_chunk(self, content: str):
@@ -669,6 +724,19 @@ class PopupWindow(QWidget):
         else:
             self._apply_plain_style()
 
+        # 显示固定按钮
+        self.btn_pin.setVisible(True)
+
+        # 在对话模式下，添加继续对话的提示
+        if self.is_chat_mode:
+            # 显示对话轮数
+            round_num = len(self.chat_history)
+            self.result_text.append(f"\n\n--- 第{round_num}轮对话结束 ---")
+            self.result_text.append("点击 ❓ 提问 按钮继续对话，或选择其他功能")
+
+        # 禁用自动隐藏
+        self.hide_timer.stop()
+
     @pyqtSlot(str)
     def _on_stream_error(self, error: str):
         """流式错误（在主线程中调用）"""
@@ -678,6 +746,12 @@ class PopupWindow(QWidget):
         # 隐藏进度指示器
         self.progress_container.setVisible(False)
         self._stop_loading_animation()
+
+        # 显示固定按钮
+        self.btn_pin.setVisible(True)
+
+        # 禁用自动隐藏
+        self.hide_timer.stop()
     def _call_feature_api(self, feature_type: str) -> str:
         """调用特定功能的API"""
         try:
@@ -861,6 +935,63 @@ class PopupWindow(QWidget):
 
         return False
 
+    def _on_ask_clicked(self):
+        """提问按钮点击处理 - 支持连续对话"""
+        # 首次进入对话模式时设置上下文
+        if not self.is_chat_mode:
+            self.is_chat_mode = True
+            # 清空之前的对话历史
+            self.chat_history = []
+            # 设置上下文到提问器
+            if self.question_asker:
+                self.question_asker.set_context(self.current_text)
+
+        # 显示对话输入对话框
+        self._show_chat_dialog()
+
+    def _show_chat_dialog(self):
+        """显示连续对话输入对话框"""
+        from PyQt6.QtWidgets import QInputDialog, QLineEdit
+
+        # 构建对话框标题，显示当前是第几轮对话
+        round_num = len(self.chat_history) + 1
+        title = f"连续对话 - 第{round_num}轮"
+
+        # 弹出输入对话框
+        question, ok = QInputDialog.getText(
+            self,
+            title,
+            f"请输入您的问题（基于选中的{len(self.current_text)}字符文本）：",
+            QLineEdit.EchoMode.Normal,
+            self.current_question
+        )
+
+        if ok and question.strip():
+            self.current_question = question.strip()
+            logger.info(f"用户第{round_num}轮提问: {self.current_question}")
+
+            # 显示进度指示器
+            self.progress_container.setVisible(True)
+            self._start_loading_animation()
+
+            # 显示加载状态
+            self.result_frame.setVisible(True)
+            self.result_text.setPlainText("思考中...")
+            self._apply_plain_style()
+
+            # 隐藏图表容器，显示文本区域
+            self.chart_container.setVisible(False)
+            self.result_text.setVisible(True)
+
+            # 使用流式处理
+            QTimer.singleShot(0, lambda: self._process_ask_stream())
+        else:
+            # 用户取消，如果已经有对话历史则保持在对话模式
+            if not self.chat_history:
+                self.is_chat_mode = False
+                self.progress_container.setVisible(False)
+                self._stop_loading_animation()
+
     def _apply_code_style(self):
         """应用代码块样式（浅色主题）"""
         self.result_text.setStyleSheet("""
@@ -965,6 +1096,21 @@ class PopupWindow(QWidget):
         text = self.result_text.toPlainText()
         QApplication.clipboard().setText(text) # pyright: ignore[reportOptionalMemberAccess]
 
+        # 显示复制成功提示
+        self.btn_copy.setText("✅ 已复制")
+        # 2秒后恢复
+        QTimer.singleShot(2000, lambda: self.btn_copy.setText("📋 复制"))
+
+    def _on_pin_clicked(self):
+        """固定按钮点击 - 现在仅作为视觉提示，窗口始终固定"""
+        self.is_pinned = self.btn_pin.isChecked()
+        if self.is_pinned:
+            self.btn_pin.setText("🔓 取消固定")
+            logger.info("窗口已固定")
+        else:
+            self.btn_pin.setText("📌 固定")
+            logger.info("窗口已取消固定")
+
         # 显示复制成功反馈
         self.btn_copy.setText("✅ 已复制")
 
@@ -998,8 +1144,9 @@ class PopupWindow(QWidget):
         self.hide_timer.stop()
 
     def leaveEvent(self, event): # pyright: ignore[reportIncompatibleMethodOverride]
-        """鼠标离开"""
-        self.hide_timer.start(3000)
+        """鼠标离开 - 不再自动隐藏"""
+        # 完全禁用自动隐藏，保持窗口显示
+        pass
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         """拖拽进入事件"""
@@ -1178,10 +1325,89 @@ class PopupWindow(QWidget):
         # 此功能已移除
         pass
 
+    def _process_ask_stream(self):
+        """流式处理提问 - 使用信号机制进行线程间通信（支持连续对话）"""
+        import asyncio
+        from datetime import datetime
+
+        # 防止重复启动流式任务
+        if self.is_streaming:
+            logger.warning("已有流式任务在运行，忽略重复请求")
+            return
+
+        self.result_text.setPlainText("")
+        self.is_streaming = True
+
+        # 显示流式输出状态
+        self._start_streaming_indicator()
+
+        def stream_task():
+            """流式任务"""
+            async def run_stream():
+                start_time = datetime.now()
+                current_answer = []  # 收集当前回答
+                try:
+                    if self.question_asker and self.current_question:
+                        # 不传 current_text，使用 QuestionAsker 中维护的上下文
+                        stream = self.question_asker.ask_stream(
+                            question=self.current_question
+                        )
+                    else:
+                        self.stream_error.emit("提问功能未初始化或问题为空")
+                        return
+
+                    chunk_count = 0
+                    async for chunk in stream:
+                        if not self.is_streaming:
+                            logger.info("流式输出已停止")
+                            break
+
+                        if "error" in chunk:
+                            self.stream_error.emit(chunk["error"])
+                            break
+
+                        content = chunk.get("content", "")
+                        if content:
+                            chunk_count += 1
+                            current_answer.append(content)
+                            self.stream_chunk.emit(content)
+
+                            # 每5个chunk更新一次状态
+                            if chunk_count % 5 == 0:
+                                elapsed = (datetime.now() - start_time).total_seconds()
+                                logger.debug(f"流式输出进度: {chunk_count} chunks, {elapsed:.1f}s")
+
+                    # 保存对话到历史
+                    self.chat_history.append({
+                        "question": self.current_question,
+                        "answer": "".join(current_answer)
+                    })
+
+                    self.stream_complete.emit()
+
+                    elapsed = (datetime.now() - start_time).total_seconds()
+                    logger.info(f"流式输出完成: {chunk_count} chunks, 耗时 {elapsed:.2f}s")
+
+                except Exception as e:
+                    logger.error(f"流式输出失败: {e}", exc_info=True)
+                    self.stream_error.emit(str(e))
+
+            # 在后台线程中创建独立的事件循环
+            asyncio.run(run_stream())
+
+        # 在后台线程运行流式任务
+        thread = threading.Thread(target=stream_task, daemon=True)
+        thread.start()
+
     def _process_text_stream(self, feature_type: str):
         """流式处理文本 - 使用信号机制进行线程间通信"""
         import asyncio
         from datetime import datetime
+
+        # 防止重复启动流式任务
+        if self.is_streaming:
+            logger.warning("已有流式任务在运行，忽略重复请求")
+            return
 
         self.result_text.setPlainText("")
         self.is_streaming = True

@@ -8,7 +8,14 @@ ai:
     enabled: true
     max_size: 100
     ttl: 3600
-  default_provider: ollama
+  default_provider: iflow
+  iflow:
+    api_base: http://localhost:3000
+    api_key: ''
+    enabled: true
+    max_tokens: 2048
+    model: GLM-4.7
+    temperature: 0.7
   performance:
     enabled: true
     log_interval: 60
@@ -24,7 +31,7 @@ ai:
     api_key: ''
     enabled: true
     max_tokens: 2048
-    model: gpt-oss:120b-cloud
+    model: qwen3-embedding:0.6b
     temperature: 0.7
 app:
   auto_start: false
