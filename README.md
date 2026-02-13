@@ -15,6 +15,7 @@
 ### 🤖 AI服务支持
 - **Ollama本地模型**: 保护隐私，离线使用，支持各种开源模型
 - **OpenAI兼容API**: 支持各种OpenAI兼容的服务提供商
+- **iFlow CLI**: 集成 iFlow SDK，支持智能任务规划和连续对话
 - **灵活切换**: 通过配置文件轻松切换AI提供商
 
 
@@ -385,6 +386,12 @@ A: 配置文件位置：`~/.word_selection_assistant/custom_settings.json`
 3. 提交更改
 4. 推送到分支
 5. 创建 Pull Request
+
+## 致谢
+
+特别感谢以下项目和工具的支持：
+
+- **[iFlow CLI](https://platform.iflow.cn/)** - 提供强大的 AI SDK 支持，实现智能任务规划和连续对话功能
 
 ## 许可证
 
